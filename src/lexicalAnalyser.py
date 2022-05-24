@@ -1,30 +1,51 @@
+import unidecode
 import re
-from typing import List, Tuple
+from typing import List
 from nltk.stem import SnowballStemmer
-from nltk.tokenize import word_tokenize
 from reader import Reader
 
 
 class LexicalAnalyser:
     def __init__(self) -> None:
         self.adjetivos = ["quebrado", "aquecido", "lento", "rápido", "barulho",
-                          "barulhento", "travando", "travado", "defeito", "problema", "tela azul"]
+                          "barulhento", "travando", "travado", "defeito", "problema", "tela azul", "funciona"]
         self.verbo = ['é', 'são', 'está', 'estão',
                       'fica', 'ficam', 'faz', 'faço']
         self.dispositivos = ['notebook', 'computador', 'impressora', 'pc', 'memória', 'armazenamento', 'hd', 'disco rígido', 'placa de vídeo',
                              'hdmi', 'internet', 'cooler', 'bateria', 'ram', 'carregador', 'usb', 'linux', 'windows', 'fone de ouvido', 'headset', 'headphone', 'tela']
         self.fabricante = ['dell', "samsung", "acer", "asus",
                            "lenovo", "razer", "aoc", "nvidia", "microsoft", "sony"]
-        self.indagacao = ['o que', 'qual', 'quais', 'como', 'onde', 'porque']
+        self.indagacao = ['que', 'qual', 'quais', 'como', 'onde', 'porque']
         self.negacao = ['não', 'nunca', 'sem']
 
-        self.symbol_table: List[Tuple(str, str)] = []
+        self.__normalize_reserved_words()
 
-    def start(self, sentence: str) -> List[Tuple[str, str]]:
-        pass
+    def __remove_invalid_chars(self, sentence: str) -> str:
+        return re.sub('[^a-záàâãéèêíóôõúçA-Z0-9 \n]', '', sentence, flags=re.IGNORECASE)
 
-    def remove_invalid_chars(self, sentence: str) -> str:
-        return re.sub('[^a-záàâãéèêíóôõúçA-Z0-9 \n]', '', sentence, flags=re.IGNORECASE).lower()
+    def __remove_acentos(self, sentence: str) -> str:
+        return unidecode.unidecode(sentence)
+
+    def __normalize_reserved_words(self):
+
+        def normalized_list(str_list: List[str]):
+            return [unidecode.unidecode(word) for word in str_list]
+
+        self.adjetivos = normalized_list(self.adjetivos)
+        self.fabricante = normalized_list(self.fabricante)
+        self.dispositivos = normalized_list(self.dispositivos)
+        self.negacao = normalized_list(self.negacao)
+        self.indagacao = normalized_list(self.indagacao)
+        self.verbo = normalized_list(self.verbo)
+
+    def normalization(self, sentence: str) -> str:
+        sentence = sentence.lower()
+        sentence = self.__remove_invalid_chars(sentence)
+        sentence = self.__remove_acentos(sentence)
+        return sentence.strip()
+
+    def split(self, sentence: str):
+        return sentence.split(" ")
 
     def remove_stopwords(self, sentence: List[str]):
         stopwords = Reader().read_stopwords()
@@ -39,40 +60,5 @@ class LexicalAnalyser:
             return True
         return False
 
-    def check_lexeme(self, keywords: List[str], lexeme: str):
-        is_keyword = False
-        for keyword in keywords:
-            regex_pattern = r'({})+'.format(lexeme)
-            regex_match = re.search(
-                regex_pattern, keyword, flags=re.IGNORECASE)
-            if(regex_match != None):
-                is_keyword = True
-                break
-        return is_keyword
-
-    def get_lexeme(self, source_word: str) -> List[Tuple[str, int]]:
+    def get_lexeme(self, source_word: str) -> str:
         return SnowballStemmer('portuguese').stem(source_word)
-
-    def search_repeated_words(self, word: str):
-        repeat = False
-        for symbol in self.symbol_table:
-            if(symbol[0] == word):
-                repeat = True
-        return repeat
-
-    def insert_symbol(self, keywords: List[str], word: str, type_token: str):
-        lexeme = self.get_lexeme(word)
-        if(self.check_lexeme(keywords, lexeme)):
-            if(not self.search_repeated_words(word)):
-                self.symbol_table.append((word, type_token))
-
-    def create_symbol_table(self, sentence) -> List[Tuple[str, str]]:
-        sentence = self.remove_invalid_chars(sentence).split(" ")
-        sentence_without_sw = self.remove_stopwords(sentence)
-
-        for word in sentence_without_sw:
-            if(not self.check_keyword(word)):
-                self.insert_symbol(self.dispositivos, word, 'dipositivo')
-                self.insert_symbol(self.adjetivos, word, 'adjetivo')
-                self.insert_symbol(self.fabricante, word, 'fabricante')
-                # self.insert_symbol(self.negacao, word, 'negacao')
